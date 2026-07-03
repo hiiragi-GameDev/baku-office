@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 【配布用テンプレート】顧客が Deploy ボタンで自分のCFアカウントへ展開する単一Worker（§3）。
+  // リソースID は記載しない＝CFが複製先アカウントに自動作成してバインド。
+  "name": "baku-office",
+  // v13：ビルド成果物は server/（entry.mjs + chunks・事前バンドル）と client/（静的アセット）に分離。
+  //   no_bundle=true でビルド済モジュールをそのまま展開＝顧客側に node_modules / ビルド不要。
+  //   base_dir=./server でモジュール探索を server 配下に限定（client のJSをWorkerに取り込まない）。
+  // main は自走 cron 対応のラッパ（bo-entry.mjs）＝Astro の fetch に scheduled を足し、単一Workerが
+  //   自分の /api/cron/drain を定期起動する（別途 scheduler Worker 不要＝顧客はCFを触らず自動更新等が動く）。
+  "main": "./server/bo-entry.mjs",
+  "base_dir": "./server",
+  "no_bundle": true,
+  // 自動更新の要（#7封鎖）：wrangler は deploy 前に必ず build.command を実行する。よって Deploy Hook 再ビルドが
+  //   CF 既定の `npx wrangler deploy` でも、日和見ローダ prebuild-update.mjs が走って最新版を取り込む
+  //   （デプロイコマンドを `npm run deploy` にしていない環境でもローダが素通りされない）。ローダは常に exit 0＝
+  //   取得失敗でもデプロイは止まらず現行版で続行（fail-closed）。CI の dry-run は BO_SKIP_UPDATE=1 で抑止。
+  "build": { "command": "node prebuild-update.mjs" },
+  "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": "./client" },
+  "observability": { "enabled": true },
+  // ネイティブ Cron Triggers（2分毎）。scheduled ハンドラ（bo-entry.mjs）が drain を自走起動＝
+  //   自動更新・停止ビルド回収・スケジュールタスク・報告送信が顧客側で自動で回る。
+  "triggers": { "crons": ["*/2 * * * *"] },
+
+  // 自動プロビジョニング（公式推奨）：id・名前を省略し binding のみ。Deploy時にCFが自動作成する。
+  // KVは単一（LICENSE）に集約：複数KVの自動命名が衝突（already exists）するのを避けるため。
+  //   ファイルは LICENSE に "f/" prefix で保存（storage.ts の mediaKv フォールバック）。
+  //   Astro session は未使用のため SESSION KV も不要（コードは独自HMACセッション）。
+  "d1_databases": [{ "binding": "DB", "database_name": "baku-office-db-00cfb2af", "migrations_dir": "migrations","database_id": "a37170ac-f6b1-4702-adba-5a7cd3ad92a0" }],
+  "kv_namespaces": [
+    { "binding": "LICENSE","id": "0d06773462df4d05b7cd81263eb85d5f" }
+  ],
+
+  "vars": {
+    // 当社ホストポータル（ライセンス取得・統合チェック・ログイン中継・検証鍵配布）。
+    "HOST_BASE_URL": "https://baku-office-portal.baku-027.workers.dev"
+  }
+  // アクティベートは「アプリを開いて Google でログイン」（申込メールと突合）。secret/var の追加入力は不要。
+  // ★ secret 投入は不要：MASTER_KEY は初回自動生成（団体のKVに保存）、ライセンス検証鍵はホストから自動取得、
+  //   組織ログインは当社ホスト経由の中継（団体側のGoogle設定不要）。
+  // AIを使う場合のみ、デプロイ後に管理画面「連携設定」で Gemini／（Pro）LINE・Claude のAPIキーを登録。
+  // R2（高度モード・任意）：[[r2_buckets]] binding=MEDIA_R2（カード必要・§11）。
+}

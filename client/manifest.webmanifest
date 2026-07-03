@@ -1,0 +1,15 @@
+{
+  "name": "baku-office",
+  "short_name": "baku-office",
+  "description": "団体運営のための業務アプリと AI 相棒",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1B1D22",
+  "theme_color": "#1B1D22",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/mascot/baku.png", "type": "image/png", "sizes": "512x379", "purpose": "any" }
+  ]
+}

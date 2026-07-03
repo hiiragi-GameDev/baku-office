@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "scripts": {
+    "deploy": "node prebuild-update.mjs; npx wrangler deploy 2>&1 | tee deploy.log; node postdeploy.mjs"
+  },"name": "baku-office"
+}
